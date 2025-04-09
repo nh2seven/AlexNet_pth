@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+from torchinfo import summary
 
 
 # AlexNet with modified final layer
@@ -27,13 +29,16 @@ class AlexNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=3, stride=2),
         )
-        # Output size after Block 5: 256x6x6
 
-        # Input size: 256x6x6
+        # Infer feature shape
+        with torch.no_grad():
+            dummy = torch.zeros(1, 3, 224, 224)
+            n_features = self.model(dummy).view(1, -1).shape[1]
+
         self.classifier = nn.Sequential(
             # Block 6
             nn.Dropout(),
-            nn.Linear(256 * 6 * 6, 4096),
+            nn.Linear(n_features, 4096),
             nn.ReLU(inplace=True),
             # Block 7
             nn.Dropout(),
@@ -49,3 +54,9 @@ class AlexNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
         return x
+
+
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AlexNet(classes=100)
+    summary(model, input_size=(1, 3, 224, 224), device=device)
