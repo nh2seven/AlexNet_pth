@@ -1,0 +1,22 @@
+meta:
+    num_tasks: 100
+    n_way: 5
+    k_shot: 1
+    q_queries: 15
+    inner_steps: 5
+    inner_lr: 0.01
+    outer_lr: 0.001
+    epochs: 100
+
+data:
+    image_size: 224
+    json_base: data/filelists/base.json
+    json_val: data/filelists/val.json
+    json_test: data/filelists/novel.json
+    root_dir: data/miniImageNet
+
+training:
+    batch_size: 4
+    log_every: 10
+    save_every: 5
+    checkpoint_dir: model/
