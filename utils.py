@@ -2,6 +2,10 @@ import os
 import torch
 import torch.nn.functional as F
 from copy import deepcopy
+import yaml
+
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
 
 
 class Checkpoint:
@@ -10,6 +14,7 @@ class Checkpoint:
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
 
+    # Function to save the model and optimizer state to a checkpoint
     def save(self, model, optimizer, epoch, name="checkpoint.pth"):
         torch.save({
             "epoch": epoch,
@@ -17,6 +22,7 @@ class Checkpoint:
             "optimizer": optimizer.state_dict(),
         }, os.path.join(self.model_dir, name))
 
+    # Function to load the model and optimizer state from a checkpoint
     def load(self, model, optimizer=None, name="checkpoint.pth"):
         path = os.path.join(self.model_dir, name)
         if not os.path.exists(path):
@@ -29,37 +35,40 @@ class Checkpoint:
 
 
 class Meta:
-    def __init__(self, model, device, inner_lr=0.01, inner_steps=1, n_way=5, k_shot=1, q_queries=15):
+    def __init__(self, model, device):
         self.model = model
         self.device = device
-        self.inner_lr = inner_lr
-        self.inner_steps = inner_steps
-        self.n_way = n_way
-        self.k_shot = k_shot
-        self.q_queries = q_queries
+        self.epochs = config["meta"]["epochs"]
+        self.inner_lr = config["meta"]["inner_lr"]
+        self.inner_steps = config["meta"]["inner_steps"]
+        self.n_way = config["meta"]["n_way"]
+        self.k_shot = config["meta"]["k_shot"]
+        self.q_queries = config["meta"]["q_queries"]
 
+    # Function to compute the number of parameters in the model
     def clone_model(self):
         return deepcopy(self.model)
 
+    # Function to perform a forward pass on a batch of data
     def forward_on_batch(self, model, x):
         return model(x)
 
+    # Function to compute the loss using cross-entropy
     def compute_loss(self, logits, labels):
         return F.cross_entropy(logits, labels)
 
-    def train(self, dataloader, optimizer, epochs):
+    # Function to train the model using meta-learning; each episode consists of a support set and a query set
+    def train(self, dataloader, optimizer):
         self.model.to(self.device)
         self.model.train()
 
-        for epoch in range(epochs):
+        for epoch in range(self.epochs):
             for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
                 support_x, support_y = support_x.to(self.device), support_y.to(self.device)
                 query_x, query_y = query_x.to(self.device), query_y.to(self.device)
 
-                # Step 1: clone model
                 adapted_model = self.clone_model()
 
-                # Step 2: inner loop
                 for _ in range(self.inner_steps):
                     logits = adapted_model(support_x)
                     loss = self.compute_loss(logits, support_y)
@@ -67,7 +76,6 @@ class Meta:
                     for param, grad in zip(adapted_model.parameters(), grads):
                         param.data -= self.inner_lr * grad
 
-                # Step 3: outer loop
                 query_logits = adapted_model(query_x)
                 query_loss = self.compute_loss(query_logits, query_y)
                 optimizer.zero_grad()
@@ -77,6 +85,7 @@ class Meta:
                 acc1, acc5 = self.accuracy_topk(query_logits, query_y, topk=(1, 5))
                 print(f"[Epoch {epoch} | Batch {batch_idx}] Loss: {query_loss.item():.4f} | Top-1: {acc1:.2f}% | Top-5: {acc5:.2f}%")
 
+    # Function to evaluate the model on the val set
     def evaluate(self, dataloader):
         self.model.eval()
         top1_total, top5_total, total = 0, 0, 0
@@ -91,9 +100,10 @@ class Meta:
 
         top1_avg = top1_total / total
         top5_avg = top5_total / total
-        print(f"Validation Accuracy → Top-1: {top1_avg:.2f}% | Top-5: {top5_avg:.2f}%")
+        print(f"Validation Accuracy -> Top-1: {top1_avg:.2f}% | Top-5: {top5_avg:.2f}%")
         return top1_avg, top5_avg
 
+    # Function to predict the class of a single image
     def predict(self, image_tensor):
         self.model.eval()
         image_tensor = image_tensor.to(self.device).unsqueeze(0)
@@ -103,13 +113,13 @@ class Meta:
             top_probs, top_labels = probs.topk(5)
             return top_labels[0].tolist(), top_probs[0].tolist()
 
+    # Function to compute the top-k accuracy
     def accuracy_topk(self, logits, targets, topk=(1, 5)):
-        """Computes the top-k accuracy"""
         maxk = max(topk)
         batch_size = targets.size(0)
 
         _, pred = logits.topk(maxk, 1, True, True)
-        pred = pred.t()  # shape: [topk, batch]
+        pred = pred.t()
         correct = pred.eq(targets.view(1, -1).expand_as(pred))
 
         res = []
@@ -118,3 +128,8 @@ class Meta:
             acc = (correct_k / batch_size) * 100.0
             res.append(acc.item())
         return res
+
+
+if __name__ == "__main__":
+    print("heh")
+    exit(0)
