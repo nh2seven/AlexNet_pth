@@ -3,13 +3,19 @@ import torch.nn.functional as F
 from copy import deepcopy
 import yaml
 
-with open("config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+# Set seeds for reproducibility
+torch.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 
 # Class to handle the meta-learning process
 class Meta:
-    def __init__(self, model, device):
+    def __init__(self, model, device, conf_path="config.yaml"):
+        with open(conf_path, "r") as f: # Load config from root directory unless specified otherwise
+            config = yaml.safe_load(f)
+
         self.model = model
         self.device = device
         self.epochs = config["meta"]["epochs"]
