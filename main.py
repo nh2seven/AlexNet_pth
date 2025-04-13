@@ -1,43 +1,39 @@
 import yaml
 import torch
-from dataset import MiniImageNetDataset
-from alexnet import AlexNet
-from utils import Meta, Checkpoint
+from dataset import MiniImageNetDataset, get_dataloaders
+from alexnet import AlexNet, Checkpoint
+from utils import Meta
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+# Load config file
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = AlexNet(classes=100)
+# Check if GPU is available
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
 
+# Define the transform for the dataset
 transform = transforms.Compose(
     [
         transforms.Resize(config["data"]["image_size"]),
         transforms.CenterCrop(config["data"]["image_size"]),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
 
-train_dataset = MiniImageNetDataset(
-    json_path=config["data"]["json_base"],
-    root_dir=config["data"]["root_dir"],
-    transform=transform,
-)
-
-train_loader = DataLoader(
-    train_dataset,
-    batch_size=config["training"]["batch_size"],
-    shuffle=True,
-    num_workers=4,
-    pin_memory=True,
-)
-
+model = AlexNet(classes=100)
 meta_learner = Meta(model=model, device=device)
 
+
+# Entry point for the whole project
 if __name__ == "__main__":
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["meta"]["outer_lr"])
-    checkpoint = Checkpoint(device=device, model_dir=config["training"]["checkpoint_dir"])
-    meta_learner.train(train_loader, optimizer)
-    checkpoint.save(model, optimizer, config["meta"]["epochs"], name="final.pth")
+    pass
+    # optimizer = torch.optim.Adam(model.parameters(), lr=config["meta"]["outer_lr"])
+    # checkpoint = Checkpoint(device=device, model_dir=config["training"]["checkpoint_dir"])
+    # meta_learner.train(train_loader, optimizer)
+    # checkpoint.save(model, optimizer, config["meta"]["epochs"], name="final.pth")
