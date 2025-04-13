@@ -31,57 +31,69 @@ class Meta:
 
     # Function to compute the loss using cross-entropy
     def compute_loss(self, logits, labels):
+        logits = logits.view(-1, logits.size(-1))
+        labels = labels.view(-1)
         return F.cross_entropy(logits, labels)
 
     # Function to train the model using meta-learning; each episode consists of a support set and a query set
     def train(self, dataloader, optimizer):
         self.model.to(self.device)
         self.model.train()
+        total_loss = 0
 
-        # Outer loop for meta-learning
-        for epoch in range(self.epochs):
-            for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
-                support_x, support_y = support_x.to(self.device), support_y.to(self.device)
-                query_x, query_y = query_x.to(self.device), query_y.to(self.device)
+        for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
+            support_x = support_x.to(self.device)
+            support_y = support_y.to(self.device)
+            query_x = query_x.to(self.device)
+            query_y = query_y.to(self.device)
 
-                # Inner loop for meta-learning
-                adapted_model = self.clone_model()  # Make clones of the model for each episode
-                for _ in range(self.inner_steps):
-                    logits = adapted_model(support_x)
-                    loss = self.compute_loss(logits, support_y)
-                    grads = torch.autograd.grad(loss, adapted_model.parameters(), create_graph=True)
-                    for param, grad in zip(adapted_model.parameters(), grads):
-                        param.data -= self.inner_lr * grad
+            # Forward pass
+            optimizer.zero_grad()
+            support_logits = self.model(support_x)
+            query_logits = self.model(query_x)
 
-                # Return to outer loop for calculation of query loss and meta-update
-                query_logits = adapted_model(query_x)
-                query_loss = self.compute_loss(query_logits, query_y)
-                optimizer.zero_grad()
-                query_loss.backward()
-                optimizer.step()
+            # Compute loss
+            support_loss = self.compute_loss(support_logits, support_y)
+            query_loss = self.compute_loss(query_logits, query_y)
+            loss = support_loss + query_loss
 
-                acc1, acc5 = self.accuracy_topk(query_logits, query_y, topk=(1, 5))
-                print(f"[Epoch {epoch} | Batch {batch_idx}] Loss: {query_loss.item():.4f} | Top-1: {acc1:.2f}% | Top-5: {acc5:.2f}%")
+            # Backward pass
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            
+            if batch_idx % 10 == 0:
+                print(f"Batch {batch_idx}: Loss = {loss.item():.4f}")
+
+        return total_loss / len(dataloader)
 
     # Function to evaluate the model on the val set
     def evaluate(self, dataloader):
         self.model.eval()
-        top1_total, top5_total, total = 0, 0, 0
+        total_loss = 0
+        correct = 0
+        total = 0
 
         with torch.no_grad():
-            for query_x, query_y in dataloader:
-                query_x, query_y = query_x.to(self.device), query_y.to(self.device)
-                logits = self.model(query_x)
-                acc1, acc5 = self.accuracy_topk(logits, query_y, topk=(1, 5))
-                top1_total += acc1 * query_x.size(0)
-                top5_total += acc5 * query_x.size(0)
-                total += query_x.size(0)
+            for support_x, support_y, query_x, query_y in dataloader:
+                support_x = support_x.to(self.device)
+                support_y = support_y.to(self.device)
+                query_x = query_x.to(self.device)
+                query_y = query_y.to(self.device)
 
-        top1_avg = top1_total / total
-        top5_avg = top5_total / total
-        print(f"Validation Accuracy -> Top-1: {top1_avg:.2f}% | Top-5: {top5_avg:.2f}%")
+                # Forward pass
+                query_logits = self.model(query_x)
+                
+                # Compute accuracy
+                pred = query_logits.view(-1, query_logits.size(-1)).argmax(dim=1)
+                target = query_y.view(-1)
+                correct += pred.eq(target).sum().item()
+                total += target.size(0)
 
-        return top1_avg, top5_avg
+        accuracy = 100. * correct / total
+        print(f"\nTest Accuracy: {accuracy:.2f}%")
+        return accuracy
 
     # Function to predict the class of a single image
     def predict(self, image_tensor):
