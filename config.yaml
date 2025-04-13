@@ -10,9 +10,9 @@ meta:
 
 data:
     image_size: 224
-    json_base: data/filelists/base.json
-    json_val: data/filelists/val.json
-    json_test: data/filelists/novel.json
+    json_base: data/filelists_clean/base.json
+    json_val: data/filelists_clean/val.json
+    json_test: data/filelists_clean/novel.json
     root_dir: data/miniImageNet
 
 training:
