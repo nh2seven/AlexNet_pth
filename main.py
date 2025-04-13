@@ -1,9 +1,9 @@
 import yaml
 import torch
-from dataset import MiniImageNetDataset, get_dataloaders
+from dataset import get_dataloaders
 from alexnet import AlexNet, Checkpoint
 from utils import Meta
-from torch.utils.data import DataLoader
+from torch.optim import Adam
 from torchvision import transforms
 
 # Load config file
@@ -26,14 +26,34 @@ transform = transforms.Compose(
     ]
 )
 
-model = AlexNet(classes=100)
-meta_learner = Meta(model=model, device=device)
+alex = AlexNet(classes=100)
+meta = Meta(model=alex, device=device)
+checkpoint = Checkpoint(device=device, model_dir="checkpoints")
+optimizer = Adam(alex.parameters(), lr=0.001)
+
+train_loader, val_loader, test_loader = get_dataloaders(config=config, transform=transform) 
 
 
 # Entry point for the whole project
 if __name__ == "__main__":
-    pass
-    # optimizer = torch.optim.Adam(model.parameters(), lr=config["meta"]["outer_lr"])
-    # checkpoint = Checkpoint(device=device, model_dir=config["training"]["checkpoint_dir"])
-    # meta_learner.train(train_loader, optimizer)
-    # checkpoint.save(model, optimizer, config["meta"]["epochs"], name="final.pth")
+    choice = input("1: Train\n2: Resume\n3: Inference\nAnything Else: Exit\n\n-> ")
+
+    if choice == "1":
+        print("Starting training from scratch...")
+        meta.train(dataloader=train_loader, optimizer=optimizer)
+        checkpoint.save(model=alex, optimizer=optimizer, epoch=0)
+
+    elif choice == "2":
+        print("Resuming training from checkpoint...")
+        epoch = checkpoint.load(model=alex, optimizer=optimizer)
+        meta.train(dataloader=train_loader, optimizer=optimizer)
+        checkpoint.save(model=alex, optimizer=optimizer, epoch=epoch)
+
+    elif choice == "3":
+        print("Starting inference...")
+        checkpoint.load(model=alex)
+        meta.evaluate(dataloader=test_loader)
+    
+    else:
+        print("Exiting...\nRestart if you want to train or resume training.")
+        exit(0)
