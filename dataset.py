@@ -6,8 +6,9 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 
+# Custom Dataset for MiniImageNet
 class MiniImageNetDataset(Dataset):
-    def __init__(self, json_path, root_dir, transform=None):
+    def __init__(self, json_path, root_dir, transform=None, split=None):
         with open(json_path, "r") as f:
             data = json.load(f)
 
@@ -15,6 +16,7 @@ class MiniImageNetDataset(Dataset):
         self.labels = data["image_labels"]
         self.root_dir = root_dir
         self.transform = transform
+        self.split = split
 
     def __len__(self):
         return len(self.image_paths)
@@ -28,6 +30,54 @@ class MiniImageNetDataset(Dataset):
             image = self.transform(image)
 
         return image, label
+
+
+# Function to get DataLoaders according to filelists in data/filelists
+def get_dataloaders(config, transform):
+    # Create datasets
+    train_dataset = MiniImageNetDataset(
+        json_path=config["data"]["json_base"],
+        root_dir=config["data"]["root_dir"],
+        transform=transform,
+        split="train",
+    )
+    val_dataset = MiniImageNetDataset(
+        json_path=config["data"]["json_val"],
+        root_dir=config["data"]["root_dir"],
+        transform=transform,
+        split="val",
+    )
+    test_dataset = MiniImageNetDataset(
+        json_path=config["data"]["json_test"],
+        root_dir=config["data"]["root_dir"],
+        transform=transform,
+        split="test",
+    )
+
+    # Create DataLoaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    return train_loader, val_loader, test_loader
 
 
 # Example usage
@@ -47,12 +97,32 @@ if __name__ == "__main__":
     JSON_VAL = "data/filelists/val.json"
     JSON_TEST = "data/filelists/novel.json"
 
-    # Datasets
-    train_dataset = MiniImageNetDataset(json_path=JSON_BASE, root_dir=ROOT, transform=transform)
-    val_dataset = MiniImageNetDataset(json_path=JSON_VAL, root_dir=ROOT, transform=transform)
-    test_dataset = MiniImageNetDataset(json_path=JSON_TEST, root_dir=ROOT, transform=transform)
-
-    # DataLoaders
+    # Train dataset and loader
+    train_dataset = MiniImageNetDataset(
+        json_path=JSON_BASE,
+        root_dir=ROOT,
+        transform=transform,
+        split="train",
+    )
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    print(f"[INFO] Loaded {len(train_dataset)} images for split: {train_dataset.split}")
+
+    # Validation dataset and loader
+    val_dataset = MiniImageNetDataset(
+        json_path=JSON_VAL,
+        root_dir=ROOT,
+        transform=transform,
+        split="val",
+    )
     val_loader = DataLoader(val_dataset, batch_size=64)
+    print(f"[INFO] Loaded {len(val_dataset)} images for split: {val_dataset.split}")
+
+    # Test dataset and loader
+    test_dataset = MiniImageNetDataset(
+        json_path=JSON_TEST,
+        root_dir=ROOT,
+        transform=transform,
+        split="test",
+    )
     test_loader = DataLoader(test_dataset, batch_size=64)
+    print(f"[INFO] Loaded {len(test_dataset)} images for split: {test_dataset.split}")
