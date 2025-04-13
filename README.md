@@ -1,10 +1,23 @@
-# AlexNet_pth
-- PyTorch implementation of the original AlexNet research paper.
-- This implementation uses the [miniImageNet](https://www.kaggle.com/datasets/arjunashok33/miniimagenet) dataset available on Kaggle, simply due to greater accessibility.
+# AlexNet PyTorch Implementation
+- PyTorch implementation of AlexNet for few-shot learning on the miniImageNet dataset. 
+- This implementation uses the original AlexNet architecture with modifications for model-agnostic meta learning.
+
+### Features
+- PyTorch implementation of AlexNet
+- Model-agnostic meta learning framework
+- Few-shot learning support
+- Training on [miniImageNet](https://www.kaggle.com/datasets/arjunashok33/miniimagenet) dataset
+- Checkpoint management for model states
+- Inference pipeline for predictions
+
+### Requirements
+- Python 3.11+
+- PyTorch
+- Kaggle API credentials
 
 ### Setup
-Run `setup.sh` to get and organize the miniImageNet dataset:
-```sh
+Run setup.sh to fetch and organize the miniImageNet dataset:
+```bash
 chmod +x setup.sh
 ./setup.sh
 ```
