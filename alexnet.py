@@ -87,8 +87,9 @@ class Checkpoint:
         path = os.path.join(self.model_dir, name)
         if not os.path.exists(path):
             raise FileNotFoundError(f"No checkpoint found at {path}")
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
         model.load_state_dict(checkpoint["model"])
+        model.to(self.device)
         if optimizer:
             optimizer.load_state_dict(checkpoint["optimizer"])
         return checkpoint.get("epoch", 0)
