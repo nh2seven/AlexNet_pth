@@ -38,40 +38,46 @@ class Meta:
     # Function to train the model using meta-learning; each episode consists of a support set and a query set
     def train(self, dataloader, optimizer):
         self.model.to(self.device)
-        self.model.train()
-        total_loss = 0
+        
+        for epoch in range(self.epochs):
+            self.model.train()
+            total_loss = 0
+            print(f"\nEpoch {epoch+1}/{self.epochs}")
+            print("-" * 20)
 
-        for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
-            support_x = support_x.to(self.device)
-            support_y = support_y.to(self.device)
-            query_x = query_x.to(self.device)
-            query_y = query_y.to(self.device)
+            for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
+                support_x = support_x.to(self.device)
+                support_y = support_y.to(self.device)
+                query_x = query_x.to(self.device)
+                query_y = query_y.to(self.device)
 
-            # Forward pass
-            optimizer.zero_grad()
-            support_logits = self.model(support_x)
-            query_logits = self.model(query_x)
+                # Forward pass
+                optimizer.zero_grad()
+                support_logits = self.model(support_x)
+                query_logits = self.model(query_x)
 
-            # Compute loss
-            support_loss = self.compute_loss(support_logits, support_y)
-            query_loss = self.compute_loss(query_logits, query_y)
-            loss = support_loss + query_loss
+                # Compute loss
+                support_loss = self.compute_loss(support_logits, support_y)
+                query_loss = self.compute_loss(query_logits, query_y)
+                loss = support_loss + query_loss
 
-            # Backward pass
-            loss.backward()
-            optimizer.step()
+                # Backward pass
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
 
-            total_loss += loss.item()
-            
-            if batch_idx % 10 == 0:
-                print(f"Batch {batch_idx}: Loss = {loss.item():.4f}")
+                print(f"Batch {batch_idx}: Loss = {loss.item():.4f} | Support Loss = {support_loss.item():.4f} | Query Loss = {query_loss.item():.4f}")
+
+            # Epoch summary
+            avg_loss = total_loss / len(dataloader)
+            print(f"\nEpoch {epoch+1} Summary:")
+            print(f"Average Loss: {avg_loss:.4f}")
 
         return total_loss / len(dataloader)
 
     # Function to evaluate the model on the val set
     def evaluate(self, dataloader):
         self.model.eval()
-        total_loss = 0
         correct = 0
         total = 0
 
