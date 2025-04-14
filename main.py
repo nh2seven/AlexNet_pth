@@ -26,7 +26,7 @@ transform = transforms.Compose(
     ]
 )
 
-alex = AlexNet(classes=100)
+alex = AlexNet(classes=config["meta"]["n_way"])
 meta = Meta(model=alex, device=device)
 checkpoint = Checkpoint(device=device, model_dir="checkpoints")
 optimizer = Adam(alex.parameters(), lr=0.001)
