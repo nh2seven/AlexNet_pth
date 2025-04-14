@@ -25,9 +25,28 @@ class Meta:
         self.k_shot = config["meta"]["k_shot"]
         self.q_queries = config["meta"]["q_queries"]
 
-    # Function to copy the model for each task/episode
-    def clone_model(self):
-        return deepcopy(self.model)
+    # Function to adapt a model to the support set (inner-loop update)
+    def adapt(self, model, support_x, support_y):
+        model = deepcopy(model).to(self.device)
+        model.train()
+        inner_optimizer = torch.optim.SGD(model.parameters(), lr=self.inner_lr)
+
+        # with torch.no_grad():
+        #     pre_loss = self.compute_loss(model(support_x), support_y)
+        #     print(f"Pre-adapt loss: {pre_loss.item():.4f}")
+
+        for _ in range(self.inner_steps):
+            logits = model(support_x)
+            loss = self.compute_loss(logits, support_y)
+            inner_optimizer.zero_grad()
+            loss.backward()
+            inner_optimizer.step()
+
+        # with torch.no_grad():
+        #     post_loss = self.compute_loss(model(support_x), support_y)
+        #     print(f"Post-adapt loss: {post_loss.item():.4f}")
+
+        return model
 
     # Function to compute the loss using cross-entropy
     def compute_loss(self, logits, labels):
@@ -38,7 +57,7 @@ class Meta:
     # Function to train the model using meta-learning; each episode consists of a support set and a query set
     def train(self, dataloader, optimizer):
         self.model.to(self.device)
-        
+
         for epoch in range(self.epochs):
             self.model.train()
             total_loss = 0
@@ -46,32 +65,34 @@ class Meta:
             print("-" * 20)
 
             for batch_idx, (support_x, support_y, query_x, query_y) in enumerate(dataloader):
-                support_x = support_x.to(self.device)
-                support_y = support_y.to(self.device)
-                query_x = query_x.to(self.device)
-                query_y = query_y.to(self.device)
+                support_x, support_y = support_x.to(self.device), support_y.to(self.device)
+                query_x, query_y = query_x.to(self.device), query_y.to(self.device)
 
-                # Forward pass
-                optimizer.zero_grad()
-                support_logits = self.model(support_x)
-                query_logits = self.model(query_x)
+                adapted_model = self.adapt(self.model, support_x, support_y).to(self.device)
+                adapted_model.train()
 
-                # Compute loss
-                support_loss = self.compute_loss(support_logits, support_y)
+                # Inner loop for fast adaptation
+                inner_optimizer = torch.optim.SGD(adapted_model.parameters(), lr=self.inner_lr)
+                for _ in range(self.inner_steps):
+                    logits = adapted_model(support_x)
+                    loss = self.compute_loss(logits, support_y)
+                    inner_optimizer.zero_grad()
+                    loss.backward()
+                    inner_optimizer.step()
+
+                query_logits = adapted_model(query_x)
                 query_loss = self.compute_loss(query_logits, query_y)
-                loss = support_loss + query_loss
 
-                # Backward pass
-                loss.backward()
+                # Meta-update
+                optimizer.zero_grad()
+                query_loss.backward()
                 optimizer.step()
-                total_loss += loss.item()
 
-                print(f"Batch {batch_idx}: Loss = {loss.item():.4f} | Support Loss = {support_loss.item():.4f} | Query Loss = {query_loss.item():.4f}")
+                total_loss += query_loss.item()
+                print(f"Batch {batch_idx}: Query Loss = {query_loss.item():.4f} | Support Loss = {loss.item():.4f}")
 
-            # Epoch summary
             avg_loss = total_loss / len(dataloader)
-            print(f"\nEpoch {epoch+1} Summary:")
-            print(f"Average Loss: {avg_loss:.4f}")
+            print(f"\nEpoch {epoch+1} Summary:\nAverage Query Loss: {avg_loss:.4f} | Average Support Loss: {loss.item():.4f}")
 
         return total_loss / len(dataloader)
 
@@ -81,17 +102,24 @@ class Meta:
         correct = 0
         total = 0
 
-        with torch.no_grad():
-            for support_x, support_y, query_x, query_y in dataloader:
-                support_x = support_x.to(self.device)
-                support_y = support_y.to(self.device)
-                query_x = query_x.to(self.device)
-                query_y = query_y.to(self.device)
+        for support_x, support_y, query_x, query_y in dataloader:
+            support_x, support_y = support_x.to(self.device), support_y.to(self.device)
+            query_x, query_y = query_x.to(self.device), query_y.to(self.device)
 
-                # Forward pass
-                query_logits = self.model(query_x)
-                
-                # Compute accuracy
+            # Clone and adapt the model (requires grad)
+            adapted_model = self.adapt(self.model, support_x, support_y).to(self.device)
+            inner_optimizer = torch.optim.SGD(adapted_model.parameters(), lr=self.inner_lr)
+
+            for _ in range(self.inner_steps):
+                logits = adapted_model(support_x)
+                loss = self.compute_loss(logits, support_y)
+                inner_optimizer.zero_grad()
+                loss.backward()
+                inner_optimizer.step()
+
+            # Disable grad only during final evaluation
+            with torch.no_grad():
+                query_logits = adapted_model(query_x)
                 pred = query_logits.view(-1, query_logits.size(-1)).argmax(dim=1)
                 target = query_y.view(-1)
                 correct += pred.eq(target).sum().item()
