@@ -1,5 +1,5 @@
 # AlexNet_pth
-A PyTorch implementation of AlexNet for few-shot classification** using Model-Agnostic Meta-Learning (MAML).  
+A PyTorch implementation of AlexNet for few-shot classification using Model-Agnostic Meta-Learning (MAML).  
 The model is trained on the [miniImageNet](https://www.kaggle.com/datasets/arjunashok33/miniimagenet) dataset using class-balanced episodic tasks.
 
 ## Features
