@@ -3,10 +3,10 @@ meta:
     n_way: 5
     k_shot: 1
     q_queries: 15
-    inner_steps: 5
-    inner_lr: 0.01
+    inner_steps: 10
+    inner_lr: 0.001
     outer_lr: 0.001
-    epochs: 100
+    epochs: 300
 
 data:
     image_size: 224
