@@ -1,10 +1,13 @@
 import yaml
 import torch
-from dataset import get_dataloaders
-from alexnet import AlexNet, Checkpoint
-from utils import Meta
 from torch.optim import Adam
 from torchvision import transforms
+from models.alexnet import AlexNet
+
+# utils
+from utils.dataset import get_dataloaders
+from utils.checkpoint import Checkpoint
+from utils.meta import Meta
 
 # Load config file
 with open("config.yaml", "r") as f:
