@@ -32,7 +32,7 @@ transform = transforms.Compose(
 alex = AlexNet(classes=config["meta"]["n_way"])
 meta = Meta(model=alex, device=device)
 checkpoint = Checkpoint(device=device, model_dir="checkpoints")
-optimizer = Adam(alex.parameters(), lr=0.001)
+optimizer = Adam(alex.parameters(), lr=config["meta"]["outer_lr"])
 
 train_loader, val_loader, test_loader = get_dataloaders(config=config, transform=transform) 
 
